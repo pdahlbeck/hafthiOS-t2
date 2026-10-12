@@ -6,7 +6,7 @@ import json
 
 PARAMS='intel_iommu=on iommu=pt pm_async=off apple_gmux.force_igd=1'
 MODULES='t2bce_dma t2bce_core t2bce_vhci'
-REPO='\n[arch-mact2]\nSigLevel = Never\nServer = https://mirror.funami.tech/arch-mact2/os/$arch\n'
+REPO='\n[arch-mact2]\nSigLevel = Never\nServer = https://mirror.funami.tech/arch-mact2/os/x86_64\n'
 
 def prepare(root):
     root=Path(root)

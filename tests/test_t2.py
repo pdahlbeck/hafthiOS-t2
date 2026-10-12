@@ -16,3 +16,5 @@ class T2Tests(unittest.TestCase):
     with self.assertRaises(SystemExit):runpy.run_path(str(p/'live/usr/local/bin'/name))
    self.assertIn('intel_iommu=on',s);self.assertIn('pm_async=off',s)
    self.assertIn('t2bce_vhci',s)
+   self.assertIn('https://mirror.funami.tech/arch-mact2/os/x86_64',s)
+   self.assertNotIn('/os/$arch',s)
