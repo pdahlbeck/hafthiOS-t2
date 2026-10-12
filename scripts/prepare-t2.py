@@ -20,6 +20,7 @@ def prepare(root):
 # This exception is scoped to that repository; Arch signature checks stay on.
 cat >> "$profile/pacman.conf" <<'T2REPO'
 '''+REPO+'''T2REPO
+cp /etc/pacman.conf "$profile/airootfs/etc/pacman.conf"
 cat >> "$profile/airootfs/etc/pacman.conf" <<'T2REPO'
 '''+REPO+'''T2REPO
 mkdir -p "$profile/airootfs/etc/mkinitcpio.conf.d" "$profile/airootfs/etc/mkinitcpio.d"
