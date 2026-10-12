@@ -1,0 +1,50 @@
+name: Build T2 live evaluation ISO
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: pdahlbeck/hafthiOS
+          ref: 8867975f6c8dc1c7e9cdd75341acc3d6c5422f4f
+          path: upstream
+      - name: Adapt pinned Hafthi OS to T2
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 scripts/prepare-t2.py upstream
+          bash -n upstream/scripts/build-iso.sh
+      - name: Build isolated T2 ISO
+        run: |
+          set -o pipefail
+          docker run --rm --privileged -v "$PWD:/project" -w /project/upstream archlinux:base bash -lc 'pacman -Syu --noconfirm archiso grub python mtools mkinitcpio rust git pkgconf wayland libxkbcommon systemd-libs alsa-lib && bash scripts/build-iso.sh' 2>&1 | tee t2-build.log
+          sudo chown -R "$(id -u):$(id -g)" upstream/out
+      - name: Verify final image and boot UEFI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xorriso squashfs-tools qemu-system-x86 ovmf
+          python3 scripts/verify-t2.py upstream/out/*.iso
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hafthiOS-t2-live-evaluation
+          path: |
+            upstream/out/*.iso
+            upstream/out/*.iso.sha256
+            upstream/out/size.txt
+            t2-serial.log
+          compression-level: 0
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hafthiOS-t2-build-diagnostics
+          path: |
+            t2-build.log
+            t2-serial.log
