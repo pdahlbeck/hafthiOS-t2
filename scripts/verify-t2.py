@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import subprocess,tempfile,time,sys
+import subprocess,tempfile,time,sys,shutil
 from pathlib import Path
 iso=Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory() as tmp:
@@ -17,7 +17,13 @@ with tempfile.TemporaryDirectory() as tmp:
         assert r.returncode!=0
     print('HAFTHIOS_T2_IMAGE_TEST_OK',flush=True)
     firmware=Path('/usr/share/OVMF/OVMF_CODE_4M.fd')
-    args=['qemu-system-x86_64','-machine','q35','-m','4096','-smp','2','-bios',str(firmware),'-cdrom',str(iso),'-boot','d','-display','none','-serial','file:t2-serial.log','-no-reboot','-net','none']
+    template=Path('/usr/share/OVMF/OVMF_VARS_4M.fd')
+    if not firmware.is_file() or not template.is_file():
+        raise RuntimeError('OVMF code/variables firmware pair is missing')
+    variables=p/'OVMF_VARS.fd'
+    shutil.copyfile(template,variables)
+    Path('t2-serial.log').unlink(missing_ok=True)
+    args=['qemu-system-x86_64','-machine','q35','-m','4096','-smp','2','-drive','if=pflash,format=raw,readonly=on,file='+str(firmware),'-drive','if=pflash,format=raw,file='+str(variables),'-cdrom',str(iso),'-boot','d','-display','none','-serial','file:t2-serial.log','-no-reboot','-net','none']
     process=subprocess.Popen(args)
     try:
         deadline=time.monotonic()+300
