@@ -7,6 +7,8 @@ class T2Tests(unittest.TestCase):
    p=Path(tmp);(p/'scripts').mkdir()
    (p/'scripts/build-iso.sh').write_text('iso_name="hafthios-prototype"\niso_label="HAFTHIOS"\nfile_permissions+=(\n)\nlinux\n# Use the normal Arch repositories\n')
    (p/'scripts/package-inventory.py').write_text('initramfs-linux.img')
+   (p/'docs').mkdir()
+   (p/'docs/file-guide.json').write_text('{"files":[]}')
    prepare(p)
    s=(p/'scripts/build-iso.sh').read_text()
    self.assertIn('linux-t2',s);self.assertNotIn('\nlinux\n',s)

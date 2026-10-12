@@ -2,6 +2,7 @@
 """Adapt a pinned Hafthi checkout into a live-only T2 build."""
 from pathlib import Path
 import sys
+import json
 
 PARAMS='intel_iommu=on iommu=pt pm_async=off apple_gmux.force_igd=1'
 MODULES='t2bce_dma t2bce_core t2bce_vhci'
@@ -32,6 +33,7 @@ PRESET
 printf '\\nMODULES+=(t2bce_dma t2bce_core t2bce_vhci)\\n' >> "$profile/airootfs/etc/mkinitcpio.conf.d/archiso.conf"
 find "$profile/grub" "$profile/syslinux" -name '*.cfg' -exec sed -i \\
  's/vmlinuz-linux/vmlinuz-linux-t2/g; s/initramfs-linux.img/initramfs-linux-t2.img/g; s/cow_spacesize=50%/cow_spacesize=50% '''+PARAMS+'''/g' {} +
+ln -sf ../hafthi-t2-live-check.service "$profile/airootfs/etc/systemd/system/multi-user.target.wants/hafthi-t2-live-check.service"
 ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/system/multi-user.target.wants/t2fanrd.service"
 '''
     s=s.replace('# Use the normal Arch repositories',injection+'\n# Use the normal Arch repositories')
@@ -52,9 +54,28 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
     # Avoid ordering a service after the very target that waits for it.
     p=live/'etc/systemd/system/hafthi-t2-live-check.service';p.write_text(p.read_text().replace('After=multi-user.target','After=systemd-modules-load.service'))
     d=live/'etc/systemd/system/multi-user.target.wants';d.mkdir(parents=True,exist_ok=True)
-    (d/'hafthi-t2-live-check.service').symlink_to('../hafthi-t2-live-check.service')
+
     (live/'usr/local/bin/hafthios-t2-diagnostics').write_text((Path(__file__).parent/'t2-diagnostics.py').read_text())
-    with build.open('a') as f: pass
+    catalog_path=root/'docs/file-guide.json'
+    catalog=json.loads(catalog_path.read_text())
+    known={entry['path'] for entry in catalog['files']}
+    descriptions={
+        'live/etc/NetworkManager/conf.d/wifi-backend.conf':'Selects iwd for T2 Broadcom Wi-Fi.',
+        'live/etc/hafthios-t2-live':'Identifies the live-only evaluation build.',
+        'live/etc/modprobe.d/hafthi-t2.conf':'Selects Intel graphics through Apple GMUX.',
+        'live/etc/modules-load.d/hafthi-t2.conf':'Loads the T2 internal USB input stack.',
+        'live/etc/systemd/system/hafthi-t2-live-check.service':'Reports live startup on the VM serial console.',
+        'live/usr/local/bin/hafthios-t2-diagnostics':'Collects a read-only hardware report without serial numbers.'}
+    for path,purpose in descriptions.items():
+        if path not in known:
+            catalog['files'].append({'path':path,'purpose':purpose,
+                'when':'During the T2 USB evaluation.', 'connections':[],
+                'details':['T2 live evaluation only; does not enable disk installation.']})
+    for entry in catalog['files']:
+        if entry['path'] in ('live/usr/local/bin/hafthios-install','live/usr/local/bin/hafthios-update'):
+            entry.update(purpose='Rejects this operation in the T2 live evaluation image.',
+                         details=['Disabled until physical T2 testing is complete.'])
+    catalog_path.write_text(json.dumps(catalog,indent=2)+'\n')
     # Include executable permissions via the existing Archiso profile array.
     build.write_text(build.read_text().replace('file_permissions+=(', 'file_permissions+=(\n  ["/usr/local/bin/hafthios-t2-diagnostics"]="0:0:755"'))
 
