@@ -22,6 +22,7 @@ cat >> "$profile/pacman.conf" <<'T2REPO'
 cat >> "$profile/airootfs/etc/pacman.conf" <<'T2REPO'
 '''+REPO+'''T2REPO
 mkdir -p "$profile/airootfs/etc/mkinitcpio.conf.d" "$profile/airootfs/etc/mkinitcpio.d"
+rm -f "$profile/airootfs/etc/mkinitcpio.d/linux.preset"
 cat > "$profile/airootfs/etc/mkinitcpio.d/linux-t2.preset" <<'PRESET'
 PRESETS=('archiso')
 ALL_kver='/boot/vmlinuz-linux-t2'
