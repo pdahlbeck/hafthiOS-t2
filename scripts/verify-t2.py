@@ -7,7 +7,7 @@ with tempfile.TemporaryDirectory() as tmp:
     subprocess.run(['xorriso','-osirrox','on','-indev',str(iso),'-extract','/arch',str(p/'arch')],check=True)
     assert (p/'arch/boot/x86_64/vmlinuz-linux-t2').is_file()
     assert (p/'arch/boot/x86_64/initramfs-linux-t2.img').is_file()
-    subprocess.run(['unsquashfs','-no-progress','-d',str(p/'root'),str(p/'arch/x86_64/airootfs.sfs')],check=True)
+    subprocess.run(['unsquashfs','-no-xattrs','-no-progress','-d',str(p/'root'),str(p/'arch/x86_64/airootfs.sfs')],check=True)
     root=p/'root'
     assert (root/'etc/hafthios-t2-live').is_file()
     for module in ('t2bce_dma','t2bce_core','t2bce_vhci'):
