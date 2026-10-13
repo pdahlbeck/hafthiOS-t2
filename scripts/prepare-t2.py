@@ -58,7 +58,7 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
 
     (live/'usr/local/bin/hafthios-t2-diagnostics').write_text((Path(__file__).parent/'t2-diagnostics.py').read_text())
     # Swedish keys in the Linux virtual console and in Wayland sessions.
-    write('etc/vconsole.conf', 'KEYMAP=sv-latin1\\n')
+    write('etc/vconsole.conf', 'KEYMAP=sv-latin1' + chr(10))
     session=live/'usr/local/bin/hafthios-session'
     if session.exists():
         text=session.read_text()
@@ -68,13 +68,14 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
         # The Retina welcome UI needs scaling, and the physical Intel test
         # confirmed that Cage works with GLES2 instead of forced Pixman.
         text=text.replace('WLR_RENDERER=pixman cage --', 'WLR_RENDERER=gles2 cage --')
-        text=text.replace('export GDK_BACKEND=wayland', 'export XKB_DEFAULT_LAYOUT=se GDK_SCALE=2\\nexport GDK_BACKEND=wayland', 1)
+        text=text.replace('export GDK_BACKEND=wayland', 'export XKB_DEFAULT_LAYOUT=se GDK_SCALE=2' + chr(10) + 'export GDK_BACKEND=wayland', 1)
         session.write_text(text)
     catalog_path=root/'docs/file-guide.json'
     catalog=json.loads(catalog_path.read_text())
     known={entry['path'] for entry in catalog['files']}
     descriptions={
         'live/etc/NetworkManager/conf.d/wifi-backend.conf':'Selects iwd for T2 Broadcom Wi-Fi.',
+        'live/etc/vconsole.conf':'Sets the Swedish Linux virtual-console keyboard mapping.',
         'live/etc/hafthios-t2-live':'Identifies the live-only evaluation build.',
         'live/etc/modprobe.d/hafthi-t2.conf':'Selects Intel graphics through Apple GMUX.',
         'live/etc/modules-load.d/hafthi-t2.conf':'Loads the T2 internal USB input stack.',
