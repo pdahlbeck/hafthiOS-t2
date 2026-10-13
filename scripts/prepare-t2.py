@@ -57,12 +57,19 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
     d=live/'etc/systemd/system/multi-user.target.wants';d.mkdir(parents=True,exist_ok=True)
 
     (live/'usr/local/bin/hafthios-t2-diagnostics').write_text((Path(__file__).parent/'t2-diagnostics.py').read_text())
+    # Swedish keys in the Linux virtual console and in Wayland sessions.
+    write('etc/vconsole.conf', 'KEYMAP=sv-latin1\\n')
     session=live/'usr/local/bin/hafthios-session'
     if session.exists():
         text=session.read_text()
         # Select Intel dynamically; DRM card numbers can change across boots.
         selection='for device in /sys/class/drm/card[0-9]*; do\n    [[ $(basename "$(readlink -f "$device/device/driver")") == i915 ]] || continue\n    export WLR_DRM_DEVICES="/dev/dri/$(basename "$device")"\n    break\ndone\n'
-        session.write_text(text.replace('welcome_args=()',selection+'welcome_args=()',1))
+        text=text.replace('welcome_args=()',selection+'welcome_args=()',1)
+        # The Retina welcome UI needs scaling, and the physical Intel test
+        # confirmed that Cage works with GLES2 instead of forced Pixman.
+        text=text.replace('WLR_RENDERER=pixman cage --', 'WLR_RENDERER=gles2 cage --')
+        text=text.replace('export GDK_BACKEND=wayland', 'export XKB_DEFAULT_LAYOUT=se GDK_SCALE=2\\nexport GDK_BACKEND=wayland', 1)
+        session.write_text(text)
     catalog_path=root/'docs/file-guide.json'
     catalog=json.loads(catalog_path.read_text())
     known={entry['path'] for entry in catalog['files']}
