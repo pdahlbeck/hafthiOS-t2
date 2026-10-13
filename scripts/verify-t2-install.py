@@ -13,7 +13,14 @@ from pathlib import Path
 
 
 def run(args,**kwargs):
-    return subprocess.run(args,check=True,text=True,capture_output=True,**kwargs).stdout
+    result=subprocess.run(args,text=True,capture_output=True,**kwargs)
+    if result.returncode:
+        # Never print command stdin: installer requests may contain passwords.
+        print('T2 verification command failed: '+args[0],file=sys.stderr,flush=True)
+        print(result.stdout[-16000:],file=sys.stderr,flush=True)
+        print(result.stderr[-16000:],file=sys.stderr,flush=True)
+        raise RuntimeError(f'{args[0]} exited with status {result.returncode}')
+    return result.stdout
 
 
 def digest(path):
@@ -49,8 +56,11 @@ def verify(root):
             # identity / confirmation / formatting / copying remain unchanged.
             script=root/'var/tmp/t2-ci-install.py'
             script.parent.mkdir(parents=True,exist_ok=True)
-            script.write_text('''import importlib.machinery, json
-m=importlib.machinery.SourceFileLoader('t2installer','/usr/local/bin/hafthios-install').load_module()
+            script.write_text('''import importlib.machinery, importlib.util, json
+loader=importlib.machinery.SourceFileLoader('t2installer','/usr/local/bin/hafthios-install')
+spec=importlib.util.spec_from_loader(loader.name,loader)
+m=importlib.util.module_from_spec(spec)
+loader.exec_module(m)
 m.live_root=lambda: True
 m.read_disks=lambda: m.t2_targets(json.loads(m.command(['lsblk','--json','--bytes','--tree','--output',m.COLUMNS+',FSTYPE,LABEL,PARTTYPE,PARTUUID,UUID,START,PTTYPE,TRAN,RM',LOOP])))
 plan=m.make_plan(TARGET)
