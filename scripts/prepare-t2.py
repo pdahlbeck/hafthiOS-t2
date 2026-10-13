@@ -48,8 +48,8 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
     write('etc/modprobe.d/hafthi-t2.conf','options apple-gmux force_igd=y\n')
     write('etc/modules-load.d/hafthi-t2.conf','t2bce_vhci\n')
     write('etc/hafthios-t2-live','MacBook Pro 15-inch 2018 USB evaluation; installation disabled\n')
-    write('usr/local/bin/hafthios-install','#!/usr/bin/env python3\nraise SystemExit("T2 USB-testversion: diskinstallation är ännu inte tillgänglig. Ingen disk har ändrats.")\n')
-    write('usr/local/bin/hafthios-update','#!/usr/bin/env python3\nraise SystemExit("T2-testversion: använd inte uppdateringar för vanliga Hafthi OS.")\n')
+    write('usr/local/bin/hafthios-install','#!/usr/bin/env python3\nif __name__ == "__main__":\n    raise SystemExit("T2 USB-testversion: diskinstallation är ännu inte tillgänglig. Ingen disk har ändrats.")\n')
+    write('usr/local/bin/hafthios-update','#!/usr/bin/env python3\nif __name__ == "__main__":\n    raise SystemExit("T2-testversion: använd inte uppdateringar för vanliga Hafthi OS.")\n')
     write('etc/NetworkManager/conf.d/wifi-backend.conf','[device]\nwifi.backend=iwd\n')
     write('etc/systemd/system/hafthi-t2-live-check.service','[Unit]\nAfter=multi-user.target\n[Service]\nType=oneshot\nExecStart=/bin/sh -c "echo HAFTHIOS_T2_LIVE_READY $(uname -r) > /dev/ttyS0"\n[Install]\nWantedBy=multi-user.target\n')
     # Avoid ordering a service after the very target that waits for it.
@@ -57,6 +57,12 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
     d=live/'etc/systemd/system/multi-user.target.wants';d.mkdir(parents=True,exist_ok=True)
 
     (live/'usr/local/bin/hafthios-t2-diagnostics').write_text((Path(__file__).parent/'t2-diagnostics.py').read_text())
+    session=live/'usr/local/bin/hafthios-session'
+    if session.exists():
+        text=session.read_text()
+        # Select Intel dynamically; DRM card numbers can change across boots.
+        selection='for device in /sys/class/drm/card[0-9]*; do\n    [[ $(basename "$(readlink -f "$device/device/driver")") == i915 ]] || continue\n    export WLR_DRM_DEVICES="/dev/dri/$(basename "$device")"\n    break\ndone\n'
+        session.write_text(text.replace('welcome_args=()',selection+'welcome_args=()',1))
     catalog_path=root/'docs/file-guide.json'
     catalog=json.loads(catalog_path.read_text())
     known={entry['path'] for entry in catalog['files']}

@@ -1,4 +1,4 @@
-import runpy,unittest,tempfile
+import runpy,unittest,tempfile,subprocess,sys
 from pathlib import Path
 prepare=runpy.run_path('scripts/prepare-t2.py')['prepare']
 class T2Tests(unittest.TestCase):
@@ -13,7 +13,9 @@ class T2Tests(unittest.TestCase):
    s=(p/'scripts/build-iso.sh').read_text()
    self.assertIn('linux-t2',s);self.assertNotIn('\nlinux\n',s)
    for name in ('hafthios-install','hafthios-update'):
-    with self.assertRaises(SystemExit):runpy.run_path(str(p/'live/usr/local/bin'/name))
+    runpy.run_path(str(p/'live/usr/local/bin'/name))
+    result=subprocess.run([sys.executable,str(p/'live/usr/local/bin'/name)],capture_output=True)
+    self.assertNotEqual(result.returncode,0)
    self.assertIn('intel_iommu=on',s);self.assertIn('pm_async=off',s)
    self.assertIn('t2bce_vhci',s)
    self.assertIn('https://mirror.funami.tech/arch-mact2/os/x86_64',s)
