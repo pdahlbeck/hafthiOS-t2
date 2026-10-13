@@ -3,6 +3,9 @@
 from pathlib import Path
 import sys
 import json
+import runpy
+
+adapt_installer=runpy.run_path(str(Path(__file__).with_name('adapt-installer.py')))['adapt']
 
 PARAMS='intel_iommu=on iommu=pt pm_async=off apple_gmux.force_igd=1'
 MODULES='t2bce_dma t2bce_core t2bce_vhci'
@@ -47,8 +50,20 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
         p=live/path;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
     write('etc/modprobe.d/hafthi-t2.conf','options apple-gmux force_igd=y\n')
     write('etc/modules-load.d/hafthi-t2.conf','t2bce_vhci\n')
-    write('etc/hafthios-t2-live','MacBook Pro 15-inch 2018 USB evaluation; installation disabled\n')
-    write('usr/local/bin/hafthios-install','#!/usr/bin/env python3\nif __name__ == "__main__":\n    raise SystemExit("T2 USB-testversion: diskinstallation är ännu inte tillgänglig. Ingen disk har ändrats.")\n')
+    write('etc/hafthios-t2-live','MacBook Pro 15-inch 2018; installation only into prepared HAFTHI partition\n')
+    installer=live/'usr/local/bin/hafthios-install'
+    installer.write_text(adapt_installer(installer.read_text()))
+    write('usr/local/bin/hafthios-t2-greeter', '''#!/usr/bin/env bash
+set -eu
+for device in /sys/class/drm/card[0-9]*; do
+    if [[ $(basename "$(readlink -f "$device/device/driver")") == i915 ]]; then
+        export WLR_DRM_DEVICES="/dev/dri/$(basename "$device")"
+        break
+    fi
+done
+export WLR_RENDERER=gles2 GDK_SCALE=2 GDK_BACKEND=wayland
+exec /usr/bin/cage -s -- /usr/local/bin/hafthios-greeter
+''')
     write('usr/local/bin/hafthios-update','#!/usr/bin/env python3\nif __name__ == "__main__":\n    raise SystemExit("T2-testversion: använd inte uppdateringar för vanliga Hafthi OS.")\n')
     write('etc/NetworkManager/conf.d/wifi-backend.conf','[device]\nwifi.backend=iwd\n')
     write('etc/systemd/system/hafthi-t2-live-check.service','[Unit]\nAfter=multi-user.target\n[Service]\nType=oneshot\nExecStart=/bin/sh -c "echo HAFTHIOS_T2_LIVE_READY $(uname -r) > /dev/ttyS0"\n[Install]\nWantedBy=multi-user.target\n')
@@ -57,25 +72,35 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
     d=live/'etc/systemd/system/multi-user.target.wants';d.mkdir(parents=True,exist_ok=True)
 
     (live/'usr/local/bin/hafthios-t2-diagnostics').write_text((Path(__file__).parent/'t2-diagnostics.py').read_text())
-    # Swedish keys in the Linux virtual console and in Wayland sessions.
-    write('etc/vconsole.conf', 'KEYMAP=sv-latin1' + chr(10))
+    write('etc/vconsole.conf', 'KEYMAP=sv-latin1\n')
     session=live/'usr/local/bin/hafthios-session'
     if session.exists():
         text=session.read_text()
         # Select Intel dynamically; DRM card numbers can change across boots.
         selection='for device in /sys/class/drm/card[0-9]*; do\n    [[ $(basename "$(readlink -f "$device/device/driver")") == i915 ]] || continue\n    export WLR_DRM_DEVICES="/dev/dri/$(basename "$device")"\n    break\ndone\n'
         text=text.replace('welcome_args=()',selection+'welcome_args=()',1)
-        # The Retina welcome UI needs scaling, and the physical Intel test
-        # confirmed that Cage works with GLES2 instead of forced Pixman.
-        text=text.replace('WLR_RENDERER=pixman cage --', 'WLR_RENDERER=gles2 cage --')
-        text=text.replace('export GDK_BACKEND=wayland', 'export XKB_DEFAULT_LAYOUT=se GDK_SCALE=2' + chr(10) + 'export GDK_BACKEND=wayland', 1)
+        text=text.replace('WLR_RENDERER=pixman cage --','WLR_RENDERER=gles2 cage --')
+        text=text.replace('export GDK_BACKEND=wayland','export XKB_DEFAULT_LAYOUT=se GDK_SCALE=2\nexport GDK_BACKEND=wayland',1)
         session.write_text(text)
+    welcome=live/'usr/local/bin/hafthios-welcome'
+    if welcome.exists():
+        text=welcome.read_text()
+        for old,new in {
+            'The entire selected disk will be erased. Mounted disks and the live USB are excluded.':'Only the prepared HAFTHI partition will be erased. Apple APFS and Recovery are preserved.',
+            'Erase disk and install':'Format HAFTHI and install',
+            'Radera disken och installera':'Formatera HAFTHI och installera',
+            'Live USB · Installation erases only the disk you confirm.':'T2 USB · Only the HAFTHI partition is formatted; Apple APFS is preserved.',
+            'Live-USB · Installationen raderar bara disken som du bekräftar.':'T2 USB · Bara HAFTHI formateras; Apple APFS bevaras.',
+            'ALL DATA ON ':'ALL DATA ON THIS HAFTHI PARTITION: ',
+        }.items():text=text.replace(old,new)
+        welcome.write_text(text)
     catalog_path=root/'docs/file-guide.json'
     catalog=json.loads(catalog_path.read_text())
     known={entry['path'] for entry in catalog['files']}
     descriptions={
-        'live/etc/NetworkManager/conf.d/wifi-backend.conf':'Selects iwd for T2 Broadcom Wi-Fi.',
+        'live/usr/local/bin/hafthios-t2-greeter':'Starts the installed greeter using Intel graphics, GLES2 and Retina scaling.',
         'live/etc/vconsole.conf':'Sets the Swedish Linux virtual-console keyboard mapping.',
+        'live/etc/NetworkManager/conf.d/wifi-backend.conf':'Selects iwd for T2 Broadcom Wi-Fi.',
         'live/etc/hafthios-t2-live':'Identifies the live-only evaluation build.',
         'live/etc/modprobe.d/hafthi-t2.conf':'Selects Intel graphics through Apple GMUX.',
         'live/etc/modules-load.d/hafthi-t2.conf':'Loads the T2 internal USB input stack.',
@@ -87,11 +112,14 @@ ln -sf /usr/lib/systemd/system/t2fanrd.service "$profile/airootfs/etc/systemd/sy
                 'when':'During the T2 USB evaluation.', 'connections':[],
                 'details':['T2 live evaluation only; does not enable disk installation.']})
     for entry in catalog['files']:
-        if entry['path'] in ('live/usr/local/bin/hafthios-install','live/usr/local/bin/hafthios-update'):
+        if entry['path']=='live/usr/local/bin/hafthios-install':
+            entry.update(purpose='Installs T2 Hafthi into an existing HAFTHI partition.',
+                         details=['Never repartitions the disk or formats Apple APFS/Recovery or EFI.'])
+        if entry['path']=='live/usr/local/bin/hafthios-update':
             entry.update(purpose='Rejects this operation in the T2 live evaluation image.',
                          details=['Disabled until physical T2 testing is complete.'])
     catalog_path.write_text(json.dumps(catalog,indent=2)+'\n')
     # Include executable permissions via the existing Archiso profile array.
-    build.write_text(build.read_text().replace('file_permissions+=(', 'file_permissions+=(\n  ["/usr/local/bin/hafthios-t2-diagnostics"]="0:0:755"'))
+    build.write_text(build.read_text().replace('file_permissions+=(', 'file_permissions+=(\n  ["/usr/local/bin/hafthios-t2-diagnostics"]="0:0:755"\n  ["/usr/local/bin/hafthios-t2-greeter"]="0:0:755"'))
 
 if __name__=='__main__':prepare(sys.argv[1])

@@ -2,13 +2,16 @@ import runpy,unittest,tempfile,subprocess,sys
 from pathlib import Path
 prepare=runpy.run_path('scripts/prepare-t2.py')['prepare']
 class T2Tests(unittest.TestCase):
- def test_live_install_and_updater_are_disabled_and_t2_kernel_is_selected(self):
+ def test_partition_install_and_updater_guard_and_t2_kernel(self):
   with tempfile.TemporaryDirectory() as tmp:
    p=Path(tmp);(p/'scripts').mkdir()
    (p/'scripts/build-iso.sh').write_text('iso_name="hafthios-prototype"\niso_label="HAFTHIOS"\nfile_permissions+=(\n)\nlinux\n# Use the normal Arch repositories\n')
    (p/'scripts/package-inventory.py').write_text('initramfs-linux.img')
    (p/'docs').mkdir()
    (p/'docs/file-guide.json').write_text('{"files":[]}')
+   installer=p/'live/usr/local/bin/hafthios-install'
+   installer.parent.mkdir(parents=True)
+   installer.write_text(Path('tests/fixtures/upstream-install.py').read_text())
    prepare(p)
    s=(p/'scripts/build-iso.sh').read_text()
    self.assertIn('linux-t2',s);self.assertNotIn('\nlinux\n',s)
@@ -18,5 +21,8 @@ class T2Tests(unittest.TestCase):
     self.assertNotEqual(result.returncode,0)
    self.assertIn('intel_iommu=on',s);self.assertIn('pm_async=off',s)
    self.assertIn('t2bce_vhci',s)
+   self.assertNotIn("'sfdisk'",installer.read_text())
+   self.assertNotIn("'mkfs.fat'",installer.read_text())
+   self.assertIn('t2_targets',installer.read_text())
    self.assertIn('https://mirror.funami.tech/arch-mact2/os/x86_64',s)
    self.assertNotIn('/os/$arch',s)

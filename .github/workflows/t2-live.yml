@@ -29,8 +29,8 @@ jobs:
       - name: Verify final image and boot UEFI
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xorriso squashfs-tools qemu-system-x86 ovmf
-          python3 scripts/verify-t2.py upstream/out/*.iso
+          sudo apt-get install -y --no-install-recommends xorriso squashfs-tools qemu-system-x86 ovmf exfatprogs dosfstools fdisk
+          sudo python3 scripts/verify-t2.py upstream/out/*.iso
       - uses: actions/upload-artifact@v4
         with:
           name: hafthiOS-t2-live-evaluation
@@ -39,6 +39,7 @@ jobs:
             upstream/out/*.iso.sha256
             upstream/out/size.txt
             t2-serial.log
+            t2-installed-serial.log
           compression-level: 0
           retention-days: 14
       - uses: actions/upload-artifact@v4
@@ -48,3 +49,4 @@ jobs:
           path: |
             t2-build.log
             t2-serial.log
+            t2-installed-serial.log

@@ -16,6 +16,8 @@ with tempfile.TemporaryDirectory() as tmp:
         r=subprocess.run(['python3',str(root/'usr/local/bin'/name)],capture_output=True)
         assert r.returncode!=0
     print('HAFTHIOS_T2_IMAGE_TEST_OK',flush=True)
+    import runpy
+    runpy.run_path('scripts/verify-t2-install.py')['verify'](root)
     firmware=Path('/usr/share/OVMF/OVMF_CODE_4M.fd')
     template=Path('/usr/share/OVMF/OVMF_VARS_4M.fd')
     if not firmware.is_file() or not template.is_file():
