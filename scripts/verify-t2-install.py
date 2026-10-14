@@ -70,6 +70,15 @@ def test_disks():
     # lsblk reports image-backed devices as loop, not disk. Normalize only
     # this exact disposable test device; production rejects loop devices.
     devices[0]['type']='disk'
+    # /run is a fresh tmpfs in this offline chroot: no host udev database.
+    # Read filesystem and GPT metadata directly from the actual test blocks.
+    for device in [devices[0]]+devices[0].get('children',[]):
+        probe=m.command(['blkid','-p','-o','export',device['path']],allowed=(0,2))
+        properties=dict(line.split('=',1) for line in probe.splitlines() if '=' in line)
+        for field,key in {'fstype':'TYPE','label':'LABEL','uuid':'UUID',
+                          'pttype':'PTTYPE','parttype':'PART_ENTRY_TYPE',
+                          'partuuid':'PART_ENTRY_UUID'}.items():
+            if properties.get(key):device[field]=properties[key]
     targets=m.t2_targets(payload)
     if not targets:
         print('CI target rejected; block metadata:',json.dumps(payload),flush=True)
