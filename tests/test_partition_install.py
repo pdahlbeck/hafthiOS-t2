@@ -52,6 +52,10 @@ class PartitionTests(unittest.TestCase):
         d=disk();d['children'][1]['size']-=4096
         self.assertNotEqual(namespace['identity'](original),namespace['identity'](self.targets(d)[0]))
 
+    def test_production_rejects_loop_backed_disks(self):
+        d=disk();d['type']='loop'
+        self.assertEqual(self.targets(d),[])
+
     def test_efi_conflict_aborts_before_format(self):
         with tempfile.TemporaryDirectory() as directory:
             state=Path(directory);namespace['STATE']=state

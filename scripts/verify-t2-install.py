@@ -62,7 +62,19 @@ spec=importlib.util.spec_from_loader(loader.name,loader)
 m=importlib.util.module_from_spec(spec)
 loader.exec_module(m)
 m.live_root=lambda: True
-m.read_disks=lambda: m.t2_targets(json.loads(m.command(['lsblk','--json','--bytes','--tree','--output',m.COLUMNS+',FSTYPE,LABEL,PARTTYPE,PARTUUID,UUID,START,PTTYPE,TRAN,RM',LOOP])))
+def test_disks():
+    payload=json.loads(m.command(['lsblk','--json','--bytes','--tree','--output',m.COLUMNS+',FSTYPE,LABEL,PARTTYPE,PARTUUID,UUID,START,PTTYPE,TRAN,RM',LOOP]))
+    devices=payload.get('blockdevices',[])
+    if len(devices)!=1 or devices[0].get('path')!=LOOP or devices[0].get('type')!='loop':
+        raise RuntimeError('Unexpected disposable CI loop device')
+    # lsblk reports image-backed devices as loop, not disk. Normalize only
+    # this exact disposable test device; production rejects loop devices.
+    devices[0]['type']='disk'
+    targets=m.t2_targets(payload)
+    if not targets:
+        print('CI target rejected; block metadata:',json.dumps(payload),flush=True)
+    return targets
+m.read_disks=test_disks
 plan=m.make_plan(TARGET)
 m.install({'token':plan['token'],'confirmation':plan['confirmation'],'password':'CI-t2-password','settings':{'language':'sv','keyboard':'se'}})
 '''.replace('LOOP',repr(loop)).replace('TARGET',repr(target)))
